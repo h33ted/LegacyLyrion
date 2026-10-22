@@ -1,0 +1,22 @@
+# build output
+build/
+.gradle/
+local.properties
+*.iml
+.idea/
+captures/
+
+# signing material: never commit
+*.jks
+*.keystore
+_secrets/
+
+# local working folders
+builds/
+_ref/
+_to_delete/
+ci/
+
+# publishing helper (contains no secrets, but is local-only)
+_publish.ps1
+_publish.bat

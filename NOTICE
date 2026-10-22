@@ -1,0 +1,16 @@
+LegacyLyrion
+Copyright (c) 2026 h33ted
+
+Third-party material
+--------------------
+
+Icons in app/src/main/res/raw/*.svg are path data from Google's Material Design
+Icons (https://github.com/google/material-design-icons), licensed under the
+Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+The approach for using HTC Sense's own theme and widgets (HtcDeviceDefault,
+common_app_bkg, com.htc.widget.*) follows h33ted/htc-revive.
+
+Lyrion Music Server, Squeezebox and SlimProto belong to their respective
+owners. Spotify is a trademark of Spotify AB. This project is not affiliated
+with Spotify, the Lyrion project or Logitech.

@@ -1,0 +1,56 @@
+apply plugin: 'com.android.application'
+
+// Release signing comes from environment variables (set as GitHub Actions secrets),
+// so the keystore never lives in the repository. Without them, release builds fall back
+// to the debug key so local builds still install.
+def releaseKeystore = System.getenv("LL_KEYSTORE")
+
+android {
+    compileSdkVersion 28
+    buildToolsVersion "28.0.3"
+
+    defaultConfig {
+        applicationId "com.h33ted.legacylyrion"
+        minSdkVersion 14
+        targetSdkVersion 15
+        // CI passes these from the git tag (v1.2.3 -> 1.2.3); defaults for local builds
+        versionCode((project.findProperty("llVersionCode") ?: "5") as int)
+        versionName(project.findProperty("llVersionName") ?: "1.0.0")
+    }
+
+    signingConfigs {
+        debug {
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv("LL_STORE_PASSWORD")
+                keyAlias System.getenv("LL_KEY_ALIAS") ?: "legacylyrion"
+                keyPassword System.getenv("LL_KEY_PASSWORD") ?: System.getenv("LL_STORE_PASSWORD")
+                v1SigningEnabled true   // Android 4.0-6.0 only check v1
+                v2SigningEnabled true
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig releaseKeystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    lintOptions {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
+    }
+}
+
+dependencies {}

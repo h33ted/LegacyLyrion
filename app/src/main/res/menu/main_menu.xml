@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_library"
+        android:icon="@android:drawable/ic_menu_sort_by_size"
+        android:title="Library"
+        android:showAsAction="always|withText" />
+    <item
+        android:id="@+id/menu_sync"
+        android:icon="@android:drawable/ic_popup_sync"
+        android:title="Reconnect"
+        android:showAsAction="always" />
+    <item
+        android:id="@+id/menu_sound"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="Sound effects"
+        android:showAsAction="ifRoom" />
+</menu>
