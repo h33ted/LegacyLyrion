@@ -8,6 +8,13 @@ Icons in app/src/main/res/raw/*.svg are path data from Google's Material Design
 Icons (https://github.com/google/material-design-icons), licensed under the
 Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
 
+Spotify browsing and playback rely on the Spotty plugin for Lyrion Music
+Server by Michael Herger (https://github.com/michaelherger/Spotty-Plugin),
+which builds on librespot (https://github.com/librespot-org/librespot).
+LegacyLyrion does not include any Spotty code; it talks to the plugin through
+Lyrion's standard controller (Jive) menus. Spotty must be installed separately
+on the Lyrion server, and is credited and licensed by its own authors.
+
 The approach for using HTC Sense's own theme and widgets (HtcDeviceDefault,
 common_app_bkg, com.htc.widget.*) follows h33ted/htc-revive.
 
