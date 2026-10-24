@@ -15,9 +15,16 @@ LegacyLyrion does not include any Spotty code; it talks to the plugin through
 Lyrion's standard controller (Jive) menus. Spotty must be installed separately
 on the Lyrion server, and is credited and licensed by its own authors.
 
+YouTube Music browsing and playback rely on the YouTube Music for LMS plugin
+by schmij97 (https://github.com/schmij97/lms-ytmusic), which uses yt-dlp
+(https://github.com/yt-dlp/yt-dlp). LegacyLyrion does not include any of its
+code; it talks to the plugin through the same Jive menus. The plugin must be
+installed separately on the Lyrion server.
+
 The approach for using HTC Sense's own theme and widgets (HtcDeviceDefault,
 common_app_bkg, com.htc.widget.*) follows h33ted/htc-revive.
 
 Lyrion Music Server, Squeezebox and SlimProto belong to their respective
-owners. Spotify is a trademark of Spotify AB. This project is not affiliated
-with Spotify, the Lyrion project or Logitech.
+owners. Spotify is a trademark of Spotify AB. YouTube and YouTube Music are
+trademarks of Google LLC. This project is not affiliated with Spotify, Google,
+the Lyrion project or Logitech.

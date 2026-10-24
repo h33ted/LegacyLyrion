@@ -3,7 +3,7 @@ package com.h33ted.legacylyrion;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-/** One shared settings file for every screen (server, player, local-only mode). */
+/** One shared settings file for every screen (server, player, music source). */
 final class Prefs {
     static final String FILE = "lyrion";
     static final String DEFAULT_HOST = ""; // no default: first-run setup finds or asks for the server
@@ -41,5 +41,23 @@ final class Prefs {
 
     static boolean setupDone(Context c) { return get(c).getBoolean("setup_done", false) || get(c).contains("lms_host"); }
 
-    static boolean localOnly(Context c) { return get(c).getBoolean("local_only", false); }
+    /** Where the home screen gets its music: Spotify (Spotty), YouTube Music, or the server's own library. */
+    static final String SRC_SPOTIFY = "spotify", SRC_YOUTUBE = "youtube", SRC_LOCAL = "local";
+
+    static String source(Context c) {
+        SharedPreferences p = get(c);
+        String s = p.getString("source", null);
+        if (s != null) return s;
+        return p.getBoolean("local_only", false) ? SRC_LOCAL : SRC_SPOTIFY;   // older versions had a checkbox
+    }
+
+    static void setSource(Context c, String s) { get(c).edit().putString("source", s).commit(); }
+
+    /** True until a music source has been chosen, by the first-start check or by hand. */
+    static boolean sourceUnset(Context c) {
+        SharedPreferences p = get(c);
+        return !p.contains("source") && !p.contains("local_only");
+    }
+
+    static boolean localOnly(Context c) { return SRC_LOCAL.equals(source(c)); }
 }

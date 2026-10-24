@@ -20,3 +20,8 @@ ci/
 # publishing helper (contains no secrets, but is local-only)
 _publish.ps1
 _publish.bat
+
+# Java ME prototype for Sony Ericsson phones (local only)
+aino/
+_release.ps1
+_release.bat

@@ -14,8 +14,8 @@ android {
         minSdkVersion 14
         targetSdkVersion 15
         // CI passes these from the git tag (v1.2.3 -> 1.2.3); defaults for local builds
-        versionCode((project.findProperty("llVersionCode") ?: "5") as int)
-        versionName(project.findProperty("llVersionName") ?: "1.0.0")
+        versionCode((project.findProperty("llVersionCode") ?: "10100") as int)
+        versionName(project.findProperty("llVersionName") ?: "1.1.0")
     }
 
     signingConfigs {

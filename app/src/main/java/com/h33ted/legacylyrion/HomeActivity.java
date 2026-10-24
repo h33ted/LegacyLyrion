@@ -24,6 +24,7 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -31,14 +32,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Launcher screen. Spotify first: a search box, then Spotty's "Made for you" mixes, your
- * playlists and the rest of Spotty's menu. Typing searches Spotify and shows grouped results.
- * With "Local library only" switched on in Settings, the same screen searches and shows the
- * music stored on the Lyrion server instead.
+ * Launcher screen with a search box, for one music source at a time (Settings or the menu's
+ * "Music source"): Spotify through the Spotty plugin (Made for you, your playlists, the rest of
+ * Spotty's menu), YouTube Music through the YouTube Music plugin (Featured, New Releases,
+ * Charts), or the music stored on the Lyrion server. Typing searches that source and shows
+ * grouped results. Both plugins speak the same Jive menus, so they share the code below.
  */
 public class HomeActivity extends Activity {
 
-    private static final int MENU_SETTINGS = 1, MENU_NOW = 2, MENU_LIBRARY = 3, MENU_FX = 4, MENU_FIND = 5, MENU_UPDATE = 6;
+    private static final int MENU_SETTINGS = 1, MENU_NOW = 2, MENU_LIBRARY = 3, MENU_FX = 4, MENU_FIND = 5, MENU_UPDATE = 6,
+            MENU_SOURCE = 7;
 
     private EditText searchBox;
     private LinearLayout content;
@@ -50,10 +53,11 @@ public class HomeActivity extends Activity {
     private int generation = 0;
     private int pending = 0;
     private String hp, pid;
-    private boolean localOnly;
+    private String source = Prefs.SRC_SPOTIFY;
 
-    // Spotty menu, fetched once per server/player
-    private JSONObject spottyTop;
+    // top menu of the current plugin (Spotty or YouTube Music), fetched once per server/player/source
+    private JSONObject appTop;
+    private String appTopCmd;
     private Item searchItem;
     private JSONObject searchBase;
 
@@ -110,7 +114,8 @@ public class HomeActivity extends Activity {
 
         loadPrefs();
         startSlimProto();
-        refresh();
+        if (Prefs.sourceUnset(this)) detectSources();
+        else refresh();
         Updater.checkDaily(this);
     }
 
@@ -144,6 +149,7 @@ public class HomeActivity extends Activity {
                 .setIcon(new SvgDrawable(this, R.raw.ic_now_playing,
                         Ui.themeColor(this, android.R.attr.actionMenuTextColor, 0xFFFFFFFF), 32))
                 .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+        menu.add(0, MENU_SOURCE, 1, "Music source");
         menu.add(0, MENU_LIBRARY, 1, "Library browser");
         menu.add(0, MENU_FX, 2, "Sound effects");
         menu.add(0, MENU_SETTINGS, 3, "Settings").setIcon(android.R.drawable.ic_menu_preferences);
@@ -156,6 +162,7 @@ public class HomeActivity extends Activity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case MENU_SETTINGS: showSettings(); return true;
+            case MENU_SOURCE: chooseSource(); return true;
             case MENU_NOW: Nav.nowPlaying(this); return true;
             case MENU_LIBRARY: Nav.library(this); return true;
             case MENU_FX: Nav.soundEffects(this); return true;
@@ -170,9 +177,141 @@ public class HomeActivity extends Activity {
     private void loadPrefs() {
         hp = Prefs.hostPort(this);
         pid = Prefs.player(this);
-        localOnly = Prefs.localOnly(this);
-        searchBox.setHint(localOnly ? "Search your library" : "What do you want to listen to?");
-        Skin.setSubtitle(this, localOnly ? "Local library" : "Spotify");
+        String old = source;
+        source = Prefs.source(this);
+        if (!source.equals(old)) {
+            searchItem = null;
+            searchBase = null;
+        }
+        searchBox.setHint(isLocal() ? "Search your library" : "What do you want to listen to?");
+        Skin.setSubtitle(this, sourceName(source));
+    }
+
+    private boolean isLocal() {
+        return Prefs.SRC_LOCAL.equals(source);
+    }
+
+    private static final String[] SOURCES = {Prefs.SRC_SPOTIFY, Prefs.SRC_YOUTUBE, Prefs.SRC_LOCAL};
+    private static final String[] SOURCE_NAMES = {"Spotify", "YouTube Music", "Local library"};
+
+    private static String sourceName(String src) {
+        for (int i = 0; i < SOURCES.length; i++) if (SOURCES[i].equals(src)) return SOURCE_NAMES[i];
+        return SOURCE_NAMES[0];
+    }
+
+    private static int sourceIndex(String src) {
+        for (int i = 0; i < SOURCES.length; i++) if (SOURCES[i].equals(src)) return i;
+        return 0;
+    }
+
+    /** Lyrion command of the plugin behind the current source. */
+    private String appCmd() {
+        return Prefs.SRC_YOUTUBE.equals(source) ? "youtubemusic" : "spotty";
+    }
+
+    private interface Found {
+        /** Which plugins Lyrion has; both false also when the server couldn't be asked (ok false). */
+        void found(boolean ok, boolean spotty, boolean youtube);
+    }
+
+    /** Asks Lyrion which music apps (plugins) it has: one "apps" request. */
+    private void findPlugins(final Found f) {
+        Rpc.call(hp, "", Rpc.cmd("apps", "0", "100"), new Rpc.Callback() {
+            @Override
+            public void done(JSONObject r, Exception e) {
+                JSONArray loop = r == null ? null : r.optJSONArray("appss_loop");
+                boolean spotty = false, youtube = false;
+                for (int i = 0; loop != null && i < loop.length(); i++) {
+                    JSONObject o = loop.optJSONObject(i);
+                    String cmd = o == null ? "" : o.optString("cmd");
+                    if ("spotty".equals(cmd)) spotty = true;
+                    if ("youtubemusic".equals(cmd)) youtube = true;
+                }
+                f.found(r != null, spotty, youtube);   // no appss_loop at all: the server has no apps
+            }
+        });
+    }
+
+    /**
+     * First start: pick the music source from what the server has. No plugin: the local library.
+     * One plugin: that one. Both: ask which should be the main one. If the server can't be asked,
+     * nothing is saved and the check runs again next time.
+     */
+    private void detectSources() {
+        progress.setVisibility(View.VISIBLE);
+        findPlugins(new Found() {
+            @Override
+            public void found(boolean ok, boolean spotty, boolean youtube) {
+                progress.setVisibility(View.GONE);
+                if (!ok) {
+                    refresh();
+                    return;
+                }
+                if (spotty && youtube) {
+                    askMainSource();
+                    return;
+                }
+                String src = spotty ? Prefs.SRC_SPOTIFY : youtube ? Prefs.SRC_YOUTUBE : Prefs.SRC_LOCAL;
+                Toast.makeText(HomeActivity.this, spotty ? "Found Spotify" : youtube ? "Found YouTube Music"
+                        : "No Spotify or YouTube Music plugin found, showing your library", Toast.LENGTH_LONG).show();
+                useSource(src);
+            }
+        });
+    }
+
+    private void askMainSource() {
+        final String[] keys = {Prefs.SRC_SPOTIFY, Prefs.SRC_YOUTUBE};
+        new AlertDialog.Builder(this)
+                .setTitle("Found Spotify and YouTube Music")
+                .setItems(new String[]{"Spotify as the main source", "YouTube Music as the main source"},
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                useSource(keys[which]);
+                                Toast.makeText(HomeActivity.this, "You can switch any time: menu > Music source",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        })
+                .setCancelable(false)
+                .show();
+    }
+
+    private void useSource(String src) {
+        Prefs.setSource(this, src);
+        loadPrefs();
+        refresh();
+    }
+
+    /** Menu > Music source: the sources this server actually has (the library is always there). */
+    private void chooseSource() {
+        findPlugins(new Found() {
+            @Override
+            public void found(boolean ok, boolean spotty, boolean youtube) {
+                final List<String> keys = new ArrayList<String>();
+                List<String> names = new ArrayList<String>();
+                for (int i = 0; i < SOURCES.length; i++) {
+                    boolean have = !ok || Prefs.SRC_LOCAL.equals(SOURCES[i])
+                            || (Prefs.SRC_SPOTIFY.equals(SOURCES[i]) && spotty)
+                            || (Prefs.SRC_YOUTUBE.equals(SOURCES[i]) && youtube);
+                    if (!have && !SOURCES[i].equals(source)) continue;
+                    keys.add(SOURCES[i]);
+                    names.add(SOURCE_NAMES[i]);
+                }
+                new AlertDialog.Builder(HomeActivity.this)
+                        .setTitle("Music source")
+                        .setSingleChoiceItems(names.toArray(new String[0]), keys.indexOf(source),
+                                new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int which) {
+                                        d.dismiss();
+                                        if (keys.get(which).equals(source)) return;
+                                        useSource(keys.get(which));
+                                    }
+                                })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
     }
 
     private void startSlimProto() {
@@ -203,17 +342,22 @@ public class HomeActivity extends Activity {
         scroll.scrollTo(0, 0);
         progress.setVisibility(View.GONE);
         if (q.length() == 0) {
-            if (localOnly) localHome(generation);
+            if (isLocal()) localHome(generation);
+            else if (Prefs.SRC_YOUTUBE.equals(source)) youtubeHome(generation);
             else spottyHome(generation);
         } else {
-            if (localOnly) localSearch(generation, q);
-            else spottySearch(generation, q);
+            if (isLocal()) localSearch(generation, q);
+            else appSearch(generation, q);
         }
     }
 
     private Ui.Section addSection(String title, View.OnClickListener seeAll, boolean shelf) {
+        return addSection(content, title, seeAll, shelf);
+    }
+
+    private Ui.Section addSection(LinearLayout parent, String title, View.OnClickListener seeAll, boolean shelf) {
         Ui.Section s = Ui.section(this, title, seeAll, shelf);
-        content.addView(s.root);
+        parent.addView(s.root);
         return s;
     }
 
@@ -329,28 +473,36 @@ public class HomeActivity extends Activity {
         return out;
     }
 
-    // ------------------------------------------------------------------ Spotify (Spotty)
+    // ------------------------------------------------------------------ plugins (Spotty, YouTube Music)
 
     private interface Ready {
         void ready(boolean ok);
     }
 
-    private void ensureSpotty(final int gen, final Ready r) {
-        if (spottyTop != null) {
+    /** Loads the current plugin's top menu once ("spotty items 0 100 menu:spotty" and the like). */
+    private void ensureApp(final int gen, final Ready r) {
+        final String app = appCmd();
+        if (appTop != null && app.equals(appTopCmd)) {
             r.ready(true);
             return;
         }
-        call(gen, Rpc.cmd("spotty", "items", "0", "100", "menu:spotty"), new Rpc.Callback() {
+        appTop = null;
+        searchItem = null;
+        searchBase = null;
+        call(gen, Rpc.cmd(app, "items", "0", "100", "menu:" + app), new Rpc.Callback() {
             @Override
             public void done(JSONObject res, Exception e) {
-                if (res != null && res.optJSONArray("item_loop") != null) spottyTop = res;
-                r.ready(spottyTop != null);
+                if (res != null && res.optJSONArray("item_loop") != null) {
+                    appTop = res;
+                    appTopCmd = app;
+                }
+                r.ready(appTop != null);
             }
         });
     }
 
     private Item findTop(String title) {
-        for (Item it : items(spottyTop)) if (it.title.equalsIgnoreCase(title)) return it;
+        for (Item it : items(appTop)) if (it.title.equalsIgnoreCase(title)) return it;
         return null;
     }
 
@@ -374,12 +526,13 @@ public class HomeActivity extends Activity {
     }
 
     private void spottyUnavailable() {
-        showMessage("Couldn't load Spotty from " + hp + ".\n\nCheck the server and player in Settings, "
-                + "make sure the Spotty plugin is installed, or switch on \"Local library only\".");
+        String plugin = Prefs.SRC_YOUTUBE.equals(source) ? "YouTube Music" : "Spotty";
+        showMessage("Couldn't load " + plugin + " from " + hp + ".\n\nCheck the server and player in Settings, "
+                + "make sure the " + plugin + " plugin is installed, or pick another music source in the menu.");
     }
 
     private void spottyHome(final int gen) {
-        ensureSpotty(gen, new Ready() {
+        ensureApp(gen, new Ready() {
             @Override
             public void ready(boolean ok) {
                 if (gen != generation) return;
@@ -388,15 +541,78 @@ public class HomeActivity extends Activity {
                     return;
                 }
                 spottyRetries = 0;
-                final JSONObject topBase = spottyTop.optJSONObject("base");
+                final JSONObject topBase = appTop.optJSONObject("base");
                 Item home = findTop("Home");
                 Item playlists = findTop("Playlists");
                 if (home != null) shelf(gen, addSection("Made for you", seeAll(home, topBase), true), home, topBase, 30, false);
                 if (playlists != null) shelf(gen, addSection("Your playlists", seeAll(playlists, topBase), true), playlists, topBase, 20, false);
                 Ui.Section browse = addSection("Browse", null, false);
-                for (Item it : items(spottyTop)) {
+                for (Item it : items(appTop)) {
                     if (it.title.equalsIgnoreCase("Home") || it.title.equalsIgnoreCase("Search")) continue;
                     addRow(browse, it, topBase);
+                }
+            }
+        });
+    }
+
+    /** YouTube Music folders whose sub-lists become shelves on the home screen, in this order. */
+    private static final String[] YT_SHELVES = {"Featured", "New Releases", "Charts & Trending"};
+
+    private void youtubeHome(final int gen) {
+        ensureApp(gen, new Ready() {
+            @Override
+            public void ready(boolean ok) {
+                if (gen != generation) return;
+                if (!ok) {
+                    if (!retrySpotty(gen)) spottyUnavailable();
+                    return;
+                }
+                spottyRetries = 0;
+                JSONObject topBase = appTop.optJSONObject("base");
+                for (String name : YT_SHELVES) {
+                    Item folder = findTop(name);
+                    if (folder == null) continue;
+                    LinearLayout holder = new LinearLayout(HomeActivity.this);   // keeps the order while loading
+                    holder.setOrientation(LinearLayout.VERTICAL);
+                    content.addView(holder);
+                    expandShelves(gen, holder, folder, topBase, 2);
+                }
+                Ui.Section browse = addSection("Browse", null, false);
+                for (Item it : items(appTop)) {
+                    if (it.title.equalsIgnoreCase("Search")) continue;
+                    boolean shelved = false;
+                    for (String name : YT_SHELVES) if (it.title.equalsIgnoreCase(name)) shelved = true;
+                    if (!shelved) addRow(browse, it, topBase);
+                }
+            }
+        });
+    }
+
+    /**
+     * Opens a folder and shows what's inside as shelves: if it holds playlists/albums/songs
+     * directly, one shelf named after the folder; if it holds sub-lists ("Today's biggest hits",
+     * "Top artists"...), one shelf for each of the first {@code max}.
+     */
+    private void expandShelves(final int gen, final LinearLayout holder, final Item folder, JSONObject base, final int max) {
+        JSONArray cmd = Jive.command(folder, base, "go", 20);
+        if (cmd == null) return;
+        call(gen, cmd, new Rpc.Callback() {
+            @Override
+            public void done(JSONObject r, Exception e) {
+                List<Item> list = items(r);
+                if (list.isEmpty()) return;
+                JSONObject b = r.optJSONObject("base");
+                boolean direct = false;
+                for (Item it : list) if (it.icon != null || it.isTrack()) direct = true;
+                if (direct) {
+                    Ui.Section s = addSection(holder, folder.title, seeAll(folder, b), true);
+                    for (Item it : list) addCard(s, it, b, it.isArtist());
+                    return;
+                }
+                int n = 0;
+                for (Item sub : list) {
+                    if (n++ >= max) break;
+                    shelf(gen, addSection(holder, sub.title, seeAll(sub, b), true), sub, b, 20, false);
                 }
             }
         });
@@ -434,11 +650,17 @@ public class HomeActivity extends Activity {
             r.ready(true);
             return;
         }
-        ensureSpotty(gen, new Ready() {
+        ensureApp(gen, new Ready() {
             @Override
             public void ready(boolean ok) {
                 final Item search = ok ? findTop("Search") : null;
-                JSONArray cmd = search == null ? null : Jive.command(search, spottyTop.optJSONObject("base"), "go", 20);
+                if (search != null && "search".equals(search.type)) {   // a search field right in the top menu
+                    searchItem = search;
+                    searchBase = appTop.optJSONObject("base");
+                    r.ready(true);
+                    return;
+                }
+                JSONArray cmd = search == null ? null : Jive.command(search, appTop.optJSONObject("base"), "go", 20);
                 if (cmd == null) {
                     r.ready(false);
                     return;
@@ -460,7 +682,8 @@ public class HomeActivity extends Activity {
         });
     }
 
-    private void spottySearch(final int gen, final String q) {
+    /** Search in Spotty or YouTube Music: songs, then artists, albums and playlists as shelves. */
+    private void appSearch(final int gen, final String q) {
         final Ui.Section top = addSection("Top result", null, false);
         final Ui.Section songs = addSection("Songs", null, false);
         final Ui.Section artists = addSection("Artists", null, true);
@@ -479,7 +702,7 @@ public class HomeActivity extends Activity {
                 final JSONArray cmd;
                 if (ok) {
                     cmd = Jive.withInput(Jive.command(searchItem, searchBase, "go", 60), q);
-                } else if (spottyTop != null) {
+                } else if (appTop != null && "spotty".equals(appTopCmd)) {
                     cmd = Rpc.cmd("spotty", "items", "0", "60", "menu:spotty", "item_id:1.0", "search:" + q);
                 } else {
                     if (!retrySpotty(gen)) spottyUnavailable();
@@ -495,12 +718,13 @@ public class HomeActivity extends Activity {
                         final JSONObject base = r.optJSONObject("base");
                         List<Item> all = items(r);
                         int nTracks = 0;
-                        Item fArtists = null, fAlbums = null, fPlaylists = null;
+                        Item fArtists = null, fAlbums = null, fPlaylists = null, fSongs = null;
                         for (Item it : all) {
                             if (it.isTrack()) {
                                 if (nTracks < 5) addRow(songs, it, base);
                                 nTracks++;
-                            } else if (it.title.equalsIgnoreCase("Artists")) fArtists = it;
+                            } else if (it.title.equalsIgnoreCase("Songs")) fSongs = it;
+                            else if (it.title.equalsIgnoreCase("Artists")) fArtists = it;
                             else if (it.title.equalsIgnoreCase("Albums")) fAlbums = it;
                             else if (it.title.equalsIgnoreCase("Playlists")) fPlaylists = it;
                         }
@@ -508,10 +732,11 @@ public class HomeActivity extends Activity {
                             songs.show();
                             if (nTracks > 5) addSeeAll(songs, "See all songs", cmd, true);
                         }
+                        if (fSongs != null) songResults(gen, songs, fSongs, base);
                         if (fArtists != null) results(gen, artists, top, fArtists, base, true);
                         if (fAlbums != null) results(gen, albums, null, fAlbums, base, false);
                         if (fPlaylists != null) results(gen, playlists, null, fPlaylists, base, false);
-                        if (nTracks == 0 && fArtists == null && fAlbums == null && fPlaylists == null) {
+                        if (nTracks == 0 && fSongs == null && fArtists == null && fAlbums == null && fPlaylists == null) {
                             showMessage("No results for “" + q + "”");
                         }
                     }
@@ -536,6 +761,29 @@ public class HomeActivity extends Activity {
             }
         });
         s.body.addView(more);
+    }
+
+    /** YouTube Music puts songs in a "Songs" folder: show its first five, with "See all". */
+    private void songResults(final int gen, final Ui.Section s, final Item folder, final JSONObject base) {
+        JSONArray cmd = Jive.command(folder, base, "go", 5);
+        if (cmd == null) return;
+        call(gen, cmd, new Rpc.Callback() {
+            @Override
+            public void done(JSONObject r, Exception e) {
+                List<Item> list = items(r);
+                JSONObject b = r == null ? null : r.optJSONObject("base");
+                int n = 0;
+                for (Item it : list) {
+                    if (!it.isTrack()) continue;
+                    addRow(s, it, b);
+                    n++;
+                }
+                if (n > 0) {
+                    s.show();
+                    s.setSeeAll(seeAll(folder, base));
+                }
+            }
+        });
     }
 
     /** Loads one result folder (Artists/Albums/Playlists) into a shelf; the first artist also becomes the top result. */
@@ -733,9 +981,14 @@ public class HomeActivity extends Activity {
         final CheckBox phone = new CheckBox(this);
         phone.setText("Use this phone as a player");
         phone.setChecked(Prefs.phonePlayer(this));
-        final CheckBox local = new CheckBox(this);
-        local.setText("Local library only (hide Spotify)");
-        local.setChecked(Prefs.localOnly(this));
+        TextView srcLabel = Ui.text(this, 14, false, false);
+        srcLabel.setText("Music source");
+        srcLabel.setPadding(0, Ui.dp(this, 12), 0, 0);
+        final Spinner src = new Spinner(this);
+        ArrayAdapter<String> srcAd = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, SOURCE_NAMES);
+        srcAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        src.setAdapter(srcAd);
+        src.setSelection(sourceIndex(Prefs.source(this)));
 
         box.addView(host);
         box.addView(port);
@@ -761,7 +1014,8 @@ public class HomeActivity extends Activity {
         for (int i = 0; i < lookKeys.length; i++) if (lookKeys[i].equals(oldLook)) look.setSelection(i);
 
         box.addView(phone);
-        box.addView(local);
+        box.addView(srcLabel);
+        box.addView(src);
         box.addView(lookLabel);
         box.addView(look);
 
@@ -796,7 +1050,7 @@ public class HomeActivity extends Activity {
                                 .putString("lms_host", host.getText().toString().trim())
                                 .putString("lms_port", port.getText().toString().trim())
                                 .putString("player_id", sel >= 0 && sel < ids.size() ? ids.get(sel) : pid)
-                                .putBoolean("local_only", local.isChecked())
+                                .putString("source", SOURCES[Math.max(0, src.getSelectedItemPosition())])
                                 .putBoolean("phone_player", phone.isChecked())
                                 .putString("look", lookKeys[Math.max(0, look.getSelectedItemPosition())])
                                 .commit();
@@ -804,7 +1058,7 @@ public class HomeActivity extends Activity {
                             recreate();
                             return;
                         }
-                        spottyTop = null;
+                        appTop = null;
                         searchItem = null;
                         searchBase = null;
                         loadPrefs();

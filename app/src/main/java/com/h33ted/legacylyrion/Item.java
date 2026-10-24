@@ -24,6 +24,7 @@ final class Item {
         int nl = text.indexOf('\n');
         it.title = nl >= 0 ? text.substring(0, nl) : text;
         it.subtitle = nl >= 0 ? text.substring(nl + 1).replace('\n', ' ') : "";
+        it.subtitle = stripSeconds(it.subtitle);
         it.icon = str(o, "icon");
         if (it.icon == null) it.icon = str(o, "icon-id");
         if (it.icon == null) it.icon = str(o.optJSONObject("presetParams"), "icon");
@@ -72,6 +73,14 @@ final class Item {
     boolean isPlayableContainer() {
         if (isLocal()) return "album".equals(localKind) || "artist".equals(localKind);
         return "playlist".equals(type);
+    }
+
+    /** YouTube Music lines end in the length in seconds ("Daft Punk - Homework - 430"); drop it. */
+    static String stripSeconds(String sub) {
+        int k = sub.lastIndexOf(" - ");
+        if (k < 0 || k + 3 >= sub.length() || sub.length() - k - 3 > 5) return sub;
+        for (int i = k + 3; i < sub.length(); i++) if (!Character.isDigit(sub.charAt(i))) return sub;
+        return sub.substring(0, k);
     }
 
     String niceSubtitle() {
