@@ -21,6 +21,12 @@ import java.util.WeakHashMap;
  * HtcListItemSeparator). Those classes exist only on HTC ROMs, so they are reached by
  * reflection and everything falls back to stock widgets elsewhere.
  * (Approach from h33ted/htc-revive.)
+ *
+ * Sony Xperia (2011-2013 ROMs) keeps its UXP look in SemcGenericUxpRes.apk, resource package
+ * "com.sonyericsson.uxp", loaded into every app. From it the app takes the theme accent colour
+ * (semc_theme_accent_color, which follows the colour theme picked in the phone's settings) and
+ * the dark carbon background (semc_bg); Now Playing then follows Sony's Walkman player.
+ * Nothing of Sony's is shipped in the APK: it is all read from the phone at runtime.
  */
 final class Skin {
     static String status = "Phone default";
@@ -86,6 +92,10 @@ final class Skin {
             status = "LG White";
             return;
         }
+        if (sony(a)) {
+            status = "Xperia";   // DeviceDefault already is Sony's theme; decorate() adds the rest
+            return;
+        }
         if ("light".equals(look)) {
             a.setTheme(android.R.style.Theme_DeviceDefault_Light_DarkActionBar);
             status = "Phone default (light)";
@@ -123,11 +133,31 @@ final class Skin {
                 // fall through to the stock action bar
             }
         }
+        if (sony(a)) {
+            int bg = id(a, "semc_bg", "drawable", SONY_PKG);
+            if (bg != 0) {
+                try {
+                    a.getWindow().setBackgroundDrawableResource(bg);
+                } catch (Throwable ignored) {}
+            }
+        }
         ActionBar ab = a.getActionBar();
         if (ab != null) {
-            ab.setTitle(title);
+            if (sony(a) && title != null) {   // bold title, as in Sony's own apps
+                android.text.SpannableString t = new android.text.SpannableString(title);
+                t.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, t.length(), 0);
+                ab.setTitle(t);
+            } else {
+                ab.setTitle(title);
+            }
             ab.setSubtitle(subtitle);
             ab.setDisplayHomeAsUpEnabled(up);
+            if (sony(a)) {
+                // Sony's own apps show no app icon in the title bar (Sense hides it too). With a
+                // back arrow the home area has to stay, so the icon becomes an empty drawable.
+                if (up) ab.setIcon(new android.graphics.drawable.ColorDrawable(0));
+                else ab.setDisplayShowHomeEnabled(false);
+            }
         }
     }
 
@@ -140,8 +170,18 @@ final class Skin {
         if (a.getActionBar() != null) a.getActionBar().setSubtitle(subtitle);
     }
 
-    /** Sense section bar (dark strip with caps label), or null off HTC. */
+    /** The skin's own section bar: Sense's on HTC, Sony's list header on Xperia; null elsewhere. */
     static ViewGroup separator(Context c, String label) {
+        if (sony(c)) {
+            // Sony's theme points the standard list-separator style at its own header
+            // (SEMCWidget.TextView.ListSeparator), so a plain TextView with that style is native.
+            android.widget.TextView t = new android.widget.TextView(c, null, android.R.attr.listSeparatorTextViewStyle);
+            t.setText(label);
+            android.widget.FrameLayout f = new android.widget.FrameLayout(c);
+            f.addView(t, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            return f;
+        }
         if (!sense(c)) return null;
         try {
             Class<?> k = cls("com.htc.widget.HtcListItemSeparator");
@@ -192,6 +232,33 @@ final class Skin {
     }
 
     // ------------------------------------------------------------------
+
+    private static final String SONY_PKG = "com.sonyericsson.uxp";
+    private static Boolean sonyRes;
+
+    /** True on Sony Xperia ROMs with the UXP resources, whatever look is picked. */
+    static boolean sonyAvailable(Context c) {
+        if (sonyRes == null) {
+            sonyRes = !senseAvailable(c) && id(c, "semc_theme_accent_color", "color", SONY_PKG) != 0;
+        }
+        return sonyRes;
+    }
+
+    /** True when the Xperia look is in use (Sony ROM, the default look). */
+    static boolean sony(Context c) {
+        return sonyAvailable(c) && !holo(c) && !"light".equals(look(c));
+    }
+
+    /** The accent of the colour theme picked in the phone's Sony settings, or 0 if unavailable. */
+    static int sonyAccent(Context c) {
+        int id = id(c, "semc_theme_accent_color", "color", SONY_PKG);
+        if (id == 0) return 0;
+        try {
+            return c.getResources().getColor(id);
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
 
     private static final String LG_PKG = "com.lge.internal";
     private static Boolean lg;

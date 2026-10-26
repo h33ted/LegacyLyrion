@@ -45,7 +45,14 @@ final class Ui {
     static int textSecondary(Context c) { return themeColor(c, android.R.attr.textColorSecondary, Color.GRAY); }
 
     /** The skin's accent: link colour is the one attribute every OEM theme of this era sets. */
-    static int accent(Context c) { return themeColor(c, android.R.attr.textColorLink, textPrimary(c)); }
+    static int accent(Context c) {
+        if (Skin.sony(c)) {
+            int a = Skin.sonyAccent(c);
+            // the stock value is white; only a real theme colour counts as an accent
+            if (a != 0 && (a & 0xffffff) != 0xffffff) return a;
+        }
+        return themeColor(c, android.R.attr.textColorLink, textPrimary(c));
+    }
 
     static void selectable(View v) {
         TypedValue tv = new TypedValue();

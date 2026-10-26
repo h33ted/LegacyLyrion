@@ -83,7 +83,9 @@ final class SvgIcon {
             }
             in.close();
             svg = new String(buf, 0, n, "UTF-8");
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            android.util.Log.w("LegacyLyrion", "SVG icon " + rawRes + " couldn't be read", e);
+        }
         RectF vb = new RectF(0, 0, 24, 24);
         Matcher v = VIEWBOX.matcher(svg);
         if (v.find()) {

@@ -46,6 +46,10 @@ public class GlyphView extends View {
         setClickable(true);
         color = Ui.textPrimary(getContext()); // follow the skin, light or dark
         stroke.setStyle(Paint.Style.STROKE);
+        // Some Android 4.1 GPUs (seen on the Sony Xperia S) silently drop filled paths drawn
+        // through hardware acceleration while circles still show: only the play ring appeared.
+        // These views are small, so drawing them in software costs nothing and works everywhere.
+        setLayerType(LAYER_TYPE_SOFTWARE, null);
     }
 
     public void setGlyph(int g) {
@@ -97,6 +101,7 @@ public class GlyphView extends View {
     protected void onDraw(Canvas c) {
         float w = getWidth(), h = getHeight();
         float size = Math.min(w, h);
+        if (size <= 0) return;   // not laid out yet; never cache an icon fitted to 0 px
         int alpha = active ? 255 : 110;
         if (isPressed()) alpha = Math.min(alpha, 150);
         fill.setColor(color);
@@ -112,6 +117,7 @@ public class GlyphView extends View {
         if (fitted == null || fittedFor != raw) {
             fitted = SvgIcon.get(getContext(), raw).fit(w / 2f, h / 2f, size * (ring ? 0.56f : 0.78f));
             fittedFor = raw;
+
         }
         c.drawPath(fitted, fill);
     }

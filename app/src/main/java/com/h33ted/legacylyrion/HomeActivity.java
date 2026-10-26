@@ -1007,6 +1007,7 @@ public class HomeActivity extends Activity {
         ArrayAdapter<String> lookAd = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item,
                 htc ? new String[]{"Sense dark", "Sense light", "Holo light", "Holo dark"}
                         : lge ? new String[]{"LG White", "Holo light", "Holo dark"}
+                        : Skin.sonyAvailable(this) ? new String[]{"Xperia", "Phone light", "Holo light", "Holo dark"}
                         : new String[]{"Phone default", "Phone light", "Holo light", "Holo dark"});
         lookAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         look.setAdapter(lookAd);

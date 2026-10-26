@@ -64,9 +64,119 @@ public class MainActivity extends Activity {
                 elapsed = Math.min(duration, elapsed + 1);
                 showTime();
             }
+            tintFromArtwork();
             if (running) h.postDelayed(this, 1000);
         }
     };
+
+    // ------------------------------------------------------------------ Xperia (Walkman) look
+
+    /**
+     * In the spirit of Sony's 2012 Walkman player: light title, thin rings around previous/next as
+     * well as play, thin white seek bars with a round thumb, and a background tinted from the
+     * album art.
+     */
+    private void walkmanLook(GlyphView prev, GlyphView next) {
+        android.graphics.Typeface light = android.graphics.Typeface.create("sans-serif-light",
+                android.graphics.Typeface.NORMAL);
+        title.setTypeface(light);
+        title.setTextSize(28);
+        artist.setTypeface(light);
+        artist.setTextSize(18);
+        artist.setTextColor(Ui.textPrimary(this));
+
+        prev.setRing(true);
+        next.setRing(true);
+        thinSeekBar(seek);
+        thinSeekBar(volume);
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff000000));
+        // transparent title bar: the artwork-tinted window background runs up behind it,
+        // with a thin line along its bottom edge
+        if (getActionBar() != null) {
+            final int line = Math.max(1, Ui.dp(this, 1));
+            final android.graphics.Paint lp = new android.graphics.Paint();
+            lp.setColor(0x40ffffff);
+            getActionBar().setBackgroundDrawable(new android.graphics.drawable.Drawable() {
+                @Override
+                public void draw(android.graphics.Canvas c) {
+                    android.graphics.Rect b = getBounds();
+                    c.drawRect(b.left, b.bottom - line, b.right, b.bottom, lp);
+                }
+
+                @Override
+                public void setAlpha(int alpha) {}
+
+                @Override
+                public void setColorFilter(android.graphics.ColorFilter cf) {}
+
+                @Override
+                public int getOpacity() {
+                    return android.graphics.PixelFormat.TRANSLUCENT;
+                }
+            });
+        }
+        View content = findViewById(android.R.id.content);
+        if (content instanceof android.widget.FrameLayout) {
+            ((android.widget.FrameLayout) content).setForeground(null);   // the shadow line under the bar
+        }
+    }
+
+    /** Walkman-style seek bar: a 2dp line, white where played, with a round white thumb. */
+    private void thinSeekBar(SeekBar s) {
+        android.graphics.drawable.GradientDrawable track = new android.graphics.drawable.GradientDrawable();
+        track.setColor(0x44ffffff);
+        android.graphics.drawable.GradientDrawable done = new android.graphics.drawable.GradientDrawable();
+        done.setColor(0xffffffff);
+        android.graphics.drawable.ClipDrawable clip = new android.graphics.drawable.ClipDrawable(done,
+                android.view.Gravity.LEFT, android.graphics.drawable.ClipDrawable.HORIZONTAL);
+        android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{track, clip});
+        ld.setId(0, android.R.id.background);
+        ld.setId(1, android.R.id.progress);
+        int p = s.getProgress();
+        s.setProgressDrawable(ld);
+        int line = Ui.dp(this, 2);
+        try {   // ProgressBar keeps its bar height in private fields on Android 4.x
+            for (String f : new String[]{"mMinHeight", "mMaxHeight"}) {
+                java.lang.reflect.Field fl = android.widget.ProgressBar.class.getDeclaredField(f);
+                fl.setAccessible(true);
+                fl.setInt(s, line);
+            }
+        } catch (Throwable ignored) {}
+        android.graphics.drawable.GradientDrawable thumb = new android.graphics.drawable.GradientDrawable();
+        thumb.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        thumb.setColor(0xffffffff);
+        int t = Ui.dp(this, 14);
+        thumb.setSize(t, t);
+        s.setThumb(thumb);
+        s.setThumbOffset(t / 2);
+        s.setProgress(0);
+        s.setProgress(p);
+        s.requestLayout();
+    }
+
+    private Object tinted;
+
+    /** Background: the album art's average colour, darkened, fading to black (as Walkman does). */
+    private void tintFromArtwork() {
+        if (!Skin.sony(this)) return;
+        android.graphics.drawable.Drawable d = cover.getDrawable();
+        if (d == tinted) return;
+        tinted = d;
+        int top = 0xff101010;
+        if (d instanceof android.graphics.drawable.BitmapDrawable) {
+            android.graphics.Bitmap b = ((android.graphics.drawable.BitmapDrawable) d).getBitmap();
+            if (b != null && !b.isRecycled()) {
+                try {
+                    int c = android.graphics.Bitmap.createScaledBitmap(b, 1, 1, true).getPixel(0, 0);
+                    int r = ((c >> 16) & 255) * 45 / 100, g = ((c >> 8) & 255) * 45 / 100, bl = (c & 255) * 45 / 100;
+                    top = 0xff000000 | (r << 16) | (g << 8) | bl;
+                } catch (Throwable ignored) {}
+            }
+        }
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, new int[]{top, 0xff000000}));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,6 +208,7 @@ public class MainActivity extends Activity {
         btnQueue.setGlyph(GlyphView.QUEUE);
         ((GlyphView) findViewById(R.id.volIcon)).setGlyph(GlyphView.VOLUME);
         ((GlyphView) findViewById(R.id.volIcon)).setClickable(false);
+        if (Skin.sony(this)) walkmanLook(prev, next);
         title.setSelected(true); // marquee
 
         btnPlay.setOnClickListener(new View.OnClickListener() {

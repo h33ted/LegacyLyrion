@@ -14,7 +14,7 @@ Built for giving phones from the 2011 to 2014 era a second life as music players
 - **The phone is a player.** Built-in SlimProto player: Lyrion sees the phone as a Squeezebox named `Android - <model>` (for example `Android - LT26i`), and it plays through the phone's speaker or headphones. Each phone gets its own player ID, so several phones can play at once.
 - **Control any player.** Pick any Lyrion player (Squeezebox, piCorePlayer, squeezelite, another phone) and control it.
 - **Stock-player behaviour.** Media notification with artwork and previous / play / next, lock-screen controls, headset and Bluetooth buttons, pause when headphones are unplugged, and the phone's own sound effects (equaliser, Walkman / ClearAudio+ and similar) applied to playback.
-- **Native look on each skin.** Uses the maker's own theme where it has one: HTC Sense 5 (dark by default, light optional, with HTC's action bar, text fields and section bars), LG Optimus UI, and Sony, Samsung and other skins through Android's device theme. Plain Holo light and dark can be picked on any phone.
+- **Native look on each skin.** Uses the maker's own theme where it has one: HTC Sense 5 (dark by default, light optional, with HTC's action bar, text fields and section bars), LG Optimus UI, Sony Xperia (the carbon background, Sony's section headers and the accent colour of the phone's chosen theme, with a Now Playing screen in the style of the Walkman player), and Samsung and other skins through Android's device theme. Plain Holo light and dark can be picked on any phone.
 - **First-run setup** finds your Lyrion server on the Wi-Fi automatically, or takes an address by hand, then checks which music plugins the server has: with none it starts in your library, with one it starts there, and with both Spotty and YouTube Music it asks which should be the main source.
 - **Updates itself** from this repository's GitHub releases (Android 4.1 and newer; see below).
 
@@ -42,7 +42,7 @@ GitHub requires TLS 1.2. Android 4.1 to 4.3 have it but leave it switched off, s
 
 ## Building
 
-The project is a plain Gradle project (Android Gradle Plugin 4.2.2, Gradle 6.9, JDK 8 or 11, SDK 28, no dependencies).
+The project is a plain Gradle project (Android Gradle Plugin 4.2.2, Gradle 6.9, JDK 8, SDK 28, no dependencies).
 
 ```
 gradle assembleDebug
