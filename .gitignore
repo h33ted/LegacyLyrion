@@ -25,3 +25,5 @@ _publish.bat
 aino/
 _release.ps1
 _release.bat
+_retag.ps1
+_retag.bat

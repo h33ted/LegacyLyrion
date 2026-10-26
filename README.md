@@ -42,7 +42,7 @@ GitHub requires TLS 1.2. Android 4.1 to 4.3 have it but leave it switched off, s
 
 ## Building
 
-The project is a plain Gradle project (Android Gradle Plugin 4.2.2, Gradle 6.9, JDK 8, SDK 28, no dependencies).
+The project is a plain Gradle project (Android Gradle Plugin 4.2.2, Gradle 6.9, JDK 8 or 11, SDK 28, no dependencies).
 
 ```
 gradle assembleDebug
