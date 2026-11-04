@@ -22,6 +22,7 @@ public class LyrionRpcClient {
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         conn.setDoOutput(true);
+        Auth.apply(conn);
 
         JSONObject payload = new JSONObject();
         payload.put("id", 1);
@@ -37,6 +38,7 @@ public class LyrionRpcClient {
         os.write(body);
         os.flush();
         os.close();
+        Auth.check(conn);   // 401 with a Basic challenge -> Auth.Required
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
         StringBuilder sb = new StringBuilder();
@@ -62,6 +64,7 @@ public class LyrionRpcClient {
             }
             URL url = new URL(fullUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            Auth.apply(conn);
             conn.setConnectTimeout(3500);
             conn.setReadTimeout(3500);
             InputStream is = conn.getInputStream();

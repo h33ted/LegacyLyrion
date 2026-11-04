@@ -41,7 +41,7 @@ import java.util.List;
 public class HomeActivity extends Activity {
 
     private static final int MENU_SETTINGS = 1, MENU_NOW = 2, MENU_LIBRARY = 3, MENU_FX = 4, MENU_FIND = 5, MENU_UPDATE = 6,
-            MENU_SOURCE = 7;
+            MENU_SOURCE = 7, MENU_LOGIN = 8;
 
     private EditText searchBox;
     private LinearLayout content;
@@ -154,6 +154,7 @@ public class HomeActivity extends Activity {
         menu.add(0, MENU_FX, 2, "Sound effects");
         menu.add(0, MENU_SETTINGS, 3, "Settings").setIcon(android.R.drawable.ic_menu_preferences);
         menu.add(0, MENU_FIND, 4, "Find server");
+        menu.add(0, MENU_LOGIN, 4, "Server login");
         menu.add(0, MENU_UPDATE, 5, "Check for updates");
         return true;
     }
@@ -163,6 +164,14 @@ public class HomeActivity extends Activity {
         switch (item.getItemId()) {
             case MENU_SETTINGS: showSettings(); return true;
             case MENU_SOURCE: chooseSource(); return true;
+            case MENU_LOGIN:
+                Auth.prompt(this, hp, null, new Runnable() {
+                    @Override
+                    public void run() {
+                        recreate();
+                    }
+                });
+                return true;
             case MENU_NOW: Nav.nowPlaying(this); return true;
             case MENU_LIBRARY: Nav.library(this); return true;
             case MENU_FX: Nav.soundEffects(this); return true;
@@ -1001,14 +1010,22 @@ public class HomeActivity extends Activity {
         // Maker's skin first (default), then plain Holo on every phone.
         final boolean htc = Skin.senseAvailable(this);
         final boolean lge = Skin.lgAvailable(this);
-        final String[] lookKeys = htc ? new String[]{"auto", "light", "holo_light", "holo_dark"}
+        List<String> keyList = new ArrayList<String>(java.util.Arrays.asList(htc ? new String[]{"auto", "light", "holo_light", "holo_dark"}
                 : lge ? new String[]{"auto", "holo_light", "holo_dark"}
-                : new String[]{"auto", "light", "holo_light", "holo_dark"};
+                : new String[]{"auto", "light", "holo_light", "holo_dark"}));
+        List<String> nameList = new ArrayList<String>(java.util.Arrays.asList(htc ? new String[]{"Sense dark", "Sense light", "Holo light", "Holo dark"}
+                : lge ? new String[]{"LG White", "Holo light", "Holo dark"}
+                : Skin.sonyAvailable(this) ? new String[]{"Xperia", "Phone light", "Holo light", "Holo dark"}
+                : new String[]{"Phone default", "Phone light", "Holo light", "Holo dark"}));
+        if (Skin.materialAvailable()) {   // Android 5.0+
+            keyList.add("material_dark");
+            nameList.add("Material dark");
+            keyList.add("material_light");
+            nameList.add("Material light");
+        }
+        final String[] lookKeys = keyList.toArray(new String[0]);
         ArrayAdapter<String> lookAd = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item,
-                htc ? new String[]{"Sense dark", "Sense light", "Holo light", "Holo dark"}
-                        : lge ? new String[]{"LG White", "Holo light", "Holo dark"}
-                        : Skin.sonyAvailable(this) ? new String[]{"Xperia", "Phone light", "Holo light", "Holo dark"}
-                        : new String[]{"Phone default", "Phone light", "Holo light", "Holo dark"});
+                nameList.toArray(new String[0]));
         lookAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         look.setAdapter(lookAd);
         final String oldLook = Skin.look(this);
@@ -1019,6 +1036,22 @@ public class HomeActivity extends Activity {
         box.addView(src);
         box.addView(lookLabel);
         box.addView(look);
+        TextView sizeLabel = Ui.text(this, 14, false, false);
+        sizeLabel.setText("Size");
+        sizeLabel.setPadding(0, Ui.dp(this, 12), 0, 0);
+        final Spinner size = new Spinner(this);
+        final int[] sizes = {60, 70, 80, 90, 100, 110, 125};
+        String[] sizeNames = new String[sizes.length];
+        for (int i = 0; i < sizes.length; i++) sizeNames[i] = sizes[i] + "%" + (sizes[i] == 100 ? " (phone default)" : "");
+        ArrayAdapter<String> sizeAd = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, sizeNames);
+        sizeAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        size.setAdapter(sizeAd);
+        final int oldSize = Skin.scale(this);
+        for (int i = 0; i < sizes.length; i++) if (sizes[i] == oldSize) size.setSelection(i);
+        box.addView(sizeLabel);
+        box.addView(size);
+        ScrollView scrollBox = new ScrollView(this);   // fits small screens
+        scrollBox.addView(box);
 
         ids.add(SlimProtoService.localMac(HomeActivity.this));
         ad.add("This phone (" + SlimProtoService.deviceName() + ")");
@@ -1042,7 +1075,7 @@ public class HomeActivity extends Activity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Settings")
-                .setView(box)
+                .setView(scrollBox)
                 .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
@@ -1054,8 +1087,10 @@ public class HomeActivity extends Activity {
                                 .putString("source", SOURCES[Math.max(0, src.getSelectedItemPosition())])
                                 .putBoolean("phone_player", phone.isChecked())
                                 .putString("look", lookKeys[Math.max(0, look.getSelectedItemPosition())])
+                                .putInt("ui_scale", sizes[Math.max(0, size.getSelectedItemPosition())])
                                 .commit();
-                        if (!oldLook.equals(lookKeys[Math.max(0, look.getSelectedItemPosition())])) {
+                        if (!oldLook.equals(lookKeys[Math.max(0, look.getSelectedItemPosition())])
+                                || oldSize != sizes[Math.max(0, size.getSelectedItemPosition())]) {
                             recreate();
                             return;
                         }

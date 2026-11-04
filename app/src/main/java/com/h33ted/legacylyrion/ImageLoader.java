@@ -73,6 +73,7 @@ final class ImageLoader {
         HttpURLConnection c = null;
         try {
             c = (HttpURLConnection) new URL(url).openConnection();
+            Auth.apply(c);   // artwork comes from the Lyrion server too
             c.setConnectTimeout(4000);
             c.setReadTimeout(15000);
             if (c.getResponseCode() != 200) return null;

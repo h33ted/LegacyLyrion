@@ -267,6 +267,16 @@ public class SetupActivity extends Activity {
             @Override
             public void done(JSONObject r, Exception e) {
                 spinner.setVisibility(View.GONE);
+                if (e instanceof Auth.Required) {
+                    status.setText(hst + ":" + prt + " is password protected");
+                    Auth.prompt(SetupActivity.this, hst + ":" + prt, (Auth.Required) e, new Runnable() {
+                        @Override
+                        public void run() {
+                            test(hst, prt);
+                        }
+                    });
+                    return;
+                }
                 if (r == null) {
                     status.setText("No Lyrion server at " + hst + ":" + prt
                             + (e != null && e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));

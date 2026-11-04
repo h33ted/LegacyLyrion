@@ -44,8 +44,49 @@ final class Skin {
         return Prefs.get(c).getString("look", "auto");
     }
 
+    /** A plain Android look (Holo, or Material on 5.0+) was picked instead of the maker's skin. */
     private static boolean holo(Context c) {
-        return look(c).startsWith("holo_");
+        return look(c).startsWith("holo_") || look(c).startsWith("material_");
+    }
+
+    /** Material looks exist from Android 5.0 on. */
+    static boolean materialAvailable() {
+        return android.os.Build.VERSION.SDK_INT >= 21;
+    }
+
+    // ------------------------------------------------------------------ UI size
+
+    /** UI size in percent of the phone's own (100 = as the phone draws other apps). */
+    static int scale(Context c) {
+        return Prefs.get(c).getInt("ui_scale", 100);
+    }
+
+    /**
+     * Draws the app at a different size by changing the density its resources report, as if
+     * the phone had a lower (or higher) DPI. Every dp and sp in the app follows. Re-applied on
+     * each screen's start and after rotation, because the system resets it on config changes.
+     */
+    @SuppressWarnings("deprecation")
+    static void applyScale(Context c) {
+        int pct = scale(c);
+        android.content.res.Resources r = c.getResources();
+        android.util.DisplayMetrics sys = android.content.res.Resources.getSystem().getDisplayMetrics();
+        android.util.DisplayMetrics dm = r.getDisplayMetrics();
+        float f = pct / 100f;
+        if (Math.abs(dm.density - sys.density * f) < 0.001f) return;
+        dm.density = sys.density * f;
+        dm.scaledDensity = sys.scaledDensity * f;
+        dm.densityDpi = Math.max(60, Math.round(sys.densityDpi * f));
+        android.content.res.Configuration cfg = new android.content.res.Configuration(r.getConfiguration());
+        if (android.os.Build.VERSION.SDK_INT >= 17) cfg.densityDpi = dm.densityDpi;
+        cfg.screenWidthDp = Math.round(dm.widthPixels / dm.density);
+        cfg.screenHeightDp = Math.round(dm.heightPixels / dm.density);
+        cfg.smallestScreenWidthDp = Math.min(cfg.screenWidthDp, cfg.screenHeightDp);
+        r.updateConfiguration(cfg, dm);
+        if (c.getApplicationContext() != c) {
+            android.content.res.Resources ar = c.getApplicationContext().getResources();
+            if (ar != r) ar.updateConfiguration(cfg, dm);
+        }
     }
 
     /** True on HTC Sense ROMs (theme and widgets present), whatever look is picked. */
@@ -68,7 +109,18 @@ final class Skin {
 
     /** Before super.onCreate(). */
     static void apply(Activity a) {
+        applyScale(a);
         String look = look(a);
+        if (materialAvailable() && "material_dark".equals(look)) {
+            a.setTheme(android.R.style.Theme_Material);
+            status = "Material dark";
+            return;
+        }
+        if (materialAvailable() && "material_light".equals(look)) {
+            a.setTheme(android.R.style.Theme_Material_Light_DarkActionBar);
+            status = "Material light";
+            return;
+        }
         if ("holo_light".equals(look)) {
             a.setTheme(android.R.style.Theme_Holo_Light);
             status = "Holo light";

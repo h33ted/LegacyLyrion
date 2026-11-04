@@ -11,6 +11,7 @@ final class Prefs {
     private Prefs() {}
 
     static SharedPreferences get(Context c) {
+        Auth.init(c);
         SharedPreferences p = c.getSharedPreferences(FILE, Context.MODE_PRIVATE);
         if (!p.contains("lms_host")) {
             // migrate the old per-activity prefs written by MainActivity.getPreferences()

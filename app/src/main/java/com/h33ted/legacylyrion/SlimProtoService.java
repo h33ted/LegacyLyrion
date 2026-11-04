@@ -464,7 +464,14 @@ public class SlimProtoService extends Service {
             mp.setAudioStreamType(AudioManager.STREAM_MUSIC);
             mp.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
             mp.setVolume(currentGain, currentGain);
-            mp.setDataSource(streamUrl);
+            String login = Auth.header(host + ":" + targetPort);
+            if (login != null) {   // password-protected server: the stream needs the login too
+                java.util.Map<String, String> headers = new java.util.HashMap<String, String>();
+                headers.put("Authorization", login);
+                mp.setDataSource(this, android.net.Uri.parse(streamUrl), headers);
+            } else {
+                mp.setDataSource(streamUrl);
+            }
 
             mp.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 @Override

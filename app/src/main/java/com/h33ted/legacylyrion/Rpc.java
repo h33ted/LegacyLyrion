@@ -37,6 +37,7 @@ final class Rpc {
             @Override
             protected void onPostExecute(JSONObject r) {
                 if (cb != null) cb.done(r, err);
+                if (err instanceof Auth.Required) Auth.onRequired((Auth.Required) err);
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
