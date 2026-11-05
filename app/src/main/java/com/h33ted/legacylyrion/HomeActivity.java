@@ -1050,6 +1050,18 @@ public class HomeActivity extends Activity {
         for (int i = 0; i < sizes.length; i++) if (sizes[i] == oldSize) size.setSelection(i);
         box.addView(sizeLabel);
         box.addView(size);
+        TextView updLabel = Ui.text(this, 14, false, false);
+        updLabel.setText("Updates from");
+        updLabel.setPadding(0, Ui.dp(this, 12), 0, 0);
+        final Spinner upd = new Spinner(this);
+        final String[] updKeys = {Updater.SOURCE_SERVER, Updater.SOURCE_GITHUB};
+        ArrayAdapter<String> updAd = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item,
+                new String[]{"Lyrion server (LegacyLyrion Updates plugin)", "GitHub directly (advanced, Android 9+)"});
+        updAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        upd.setAdapter(updAd);
+        upd.setSelection(Updater.SOURCE_GITHUB.equals(Updater.source(this)) ? 1 : 0);
+        box.addView(updLabel);
+        box.addView(upd);
         ScrollView scrollBox = new ScrollView(this);   // fits small screens
         scrollBox.addView(box);
 
@@ -1088,6 +1100,7 @@ public class HomeActivity extends Activity {
                                 .putBoolean("phone_player", phone.isChecked())
                                 .putString("look", lookKeys[Math.max(0, look.getSelectedItemPosition())])
                                 .putInt("ui_scale", sizes[Math.max(0, size.getSelectedItemPosition())])
+                                .putString("update_source", updKeys[Math.max(0, upd.getSelectedItemPosition())])
                                 .commit();
                         if (!oldLook.equals(lookKeys[Math.max(0, look.getSelectedItemPosition())])
                                 || oldSize != sizes[Math.max(0, size.getSelectedItemPosition())]) {

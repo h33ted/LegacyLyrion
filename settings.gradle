@@ -1,2 +1,3 @@
 rootProject.name = "LegacyLyrion"
 include ':app'
+include ':retro'

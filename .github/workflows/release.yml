@@ -1,7 +1,10 @@
 name: Release
 
-# Push a tag like v1.2.0 to build a signed APK and publish it as a GitHub release.
-# The app's updater looks at the latest release and installs its .apk asset.
+# Push a tag like v1.3.1 to build both apps, signed, and publish them in one GitHub release:
+#   LegacyLyrion-<version>.apk        Android 4.0 and newer
+#   LegacyLyrionRetro-<version>.apk   Android 1.5 to 2.x
+# Both share the version. Updaters tell them apart by name: LegacyLyrion skips any APK with
+# "retro" in its name, and the LegacyLyrion Updates plugin on the Lyrion server has a channel each.
 #
 # Repository secrets needed (Settings > Secrets and variables > Actions):
 #   LL_KEYSTORE_B64     base64 of the release keystore (.jks)
@@ -31,6 +34,7 @@ jobs:
         with:
           packages: "platform-tools"   # the default also asks for "tools", which Google removed
 
+      # build-tools 28.0.3 also has the classic aapt, which the Retro build needs (UTF-16 resources)
       - name: Install SDK 28 and build-tools 28.0.3
         run: sdkmanager "platforms;android-28" "build-tools;28.0.3"
 
@@ -55,16 +59,19 @@ jobs:
       - name: Restore keystore
         run: echo "${{ secrets.LL_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
 
-      - name: Build signed release APK
+      - name: Build signed release APKs
         env:
           LL_KEYSTORE: ${{ runner.temp }}/release.jks
           LL_STORE_PASSWORD: ${{ secrets.LL_STORE_PASSWORD }}
           LL_KEY_ALIAS: ${{ secrets.LL_KEY_ALIAS }}
         run: |
-          gradle assembleRelease -PllVersionName=${{ steps.ver.outputs.name }} -PllVersionCode=${{ steps.ver.outputs.code }}
+          gradle :app:assembleRelease :retro:assembleRelease -PllVersionName=${{ steps.ver.outputs.name }} -PllVersionCode=${{ steps.ver.outputs.code }}
           cp app/build/outputs/apk/release/app-release.apk "LegacyLyrion-${{ steps.ver.outputs.name }}.apk"
+          cp retro/build/outputs/apk/release/LegacyLyrionRetro-release.apk "LegacyLyrionRetro-${{ steps.ver.outputs.name }}.apk"
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: LegacyLyrion-${{ steps.ver.outputs.name }}.apk
+          files: |
+            LegacyLyrion-${{ steps.ver.outputs.name }}.apk
+            LegacyLyrionRetro-${{ steps.ver.outputs.name }}.apk
           generate_release_notes: true

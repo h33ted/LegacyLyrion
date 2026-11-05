@@ -1,0 +1,81 @@
+apply plugin: 'com.android.application'
+
+// LegacyLyrion Retro: the same remote and phone player for Android 1.5 - 2.x phones
+// (Xperia X10 mini, X8, W8 and friends). Separate app, installs next to LegacyLyrion.
+// Release signing works like the main app: environment variables, never the repository.
+def releaseKeystore = System.getenv("LL_KEYSTORE")
+
+android {
+    compileSdkVersion 28
+    buildToolsVersion "28.0.3"
+
+    defaultConfig {
+        applicationId "com.h33ted.legacylyrion.retro"
+        minSdkVersion 3          // Android 1.5 Cupcake
+        targetSdkVersion 4       // 1.6 Donut: real screen sizes and densities, no compat zoom
+        versionCode((project.findProperty("llVersionCode") ?: "10000") as int)
+        versionName(project.findProperty("llVersionName") ?: "1.0.0")
+        archivesBaseName = "LegacyLyrionRetro"
+    }
+
+    signingConfigs {
+        debug {
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv("LL_STORE_PASSWORD")
+                keyAlias System.getenv("LL_KEY_ALIAS") ?: "legacylyrion"
+                keyPassword System.getenv("LL_KEY_PASSWORD") ?: System.getenv("LL_STORE_PASSWORD")
+                v1SigningEnabled true   // the only signature Android 1.x - 6.0 check
+                v2SigningEnabled true
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig releaseKeystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    lintOptions {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
+    }
+}
+
+// Android 1.5 - 2.1 can only read resource tables whose strings are UTF-16; aapt2 always
+// writes UTF-8 ("Bad string block" and a crash on those phones). After aapt2 has run, the
+// resource package is rebuilt with the classic aapt from the same build-tools, which picks
+// UTF-16 for minSdk < 8. The code never uses R ids (aapt numbers them differently): it looks
+// its two drawables up by name.
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+        output.processResourcesProvider.configure { task ->
+            task.doLast {
+                def sdk = android.sdkDirectory
+                def aapt = new File(sdk, "build-tools/${android.buildToolsVersion}/aapt" + (org.gradle.internal.os.OperatingSystem.current().isWindows() ? ".exe" : ""))
+                def androidJar = new File(sdk, "platforms/${android.compileSdkVersion}/android.jar")
+                def manifest = new File(buildDir, "intermediates/merged_manifests/${variant.name}/AndroidManifest.xml")
+                fileTree(new File(buildDir, "intermediates/processed_res/${variant.name}")).include("**/*.ap_").each { ap ->
+                    def args = [aapt.absolutePath, "package", "-f", "-M", manifest.absolutePath,
+                                "-S", file("src/main/res").absolutePath, "-I", androidJar.absolutePath,
+                                "-F", ap.absolutePath]
+                    if (variant.buildType.debuggable) args.add(2, "--debug-mode")
+                    project.exec { commandLine args }
+                }
+            }
+        }
+    }
+}
+
+dependencies {}

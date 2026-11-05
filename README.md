@@ -18,7 +18,7 @@ Built for giving phones from the 2011 to 2014 era a second life as music players
 - **UI size.** *Settings > Size* draws the whole app smaller or larger (60 to 125%), like changing the phone's DPI for this app only; handy on 240x320 flip phones.
 - **Password-protected servers.** If the server (Lyrion's own password protection, or a proxy in front of it) asks for a login, the app asks for a username and password once and sends them with every request to that server (HTTP Basic). They are stored on the phone only; ⋮ > *Server login* changes or removes them.
 - **First-run setup** finds your Lyrion server on the Wi-Fi automatically, or takes an address by hand, then checks which music plugins the server has: with none it starts in your library, with one it starts there, and with both Spotty and YouTube Music it asks which should be the main source.
-- **Updates itself** from this repository's GitHub releases (Android 4.1 and newer; see below).
+- **Updates itself** through your Lyrion server (LegacyLyrion Updates plugin), on every Android version; see below.
 
 ## Requirements
 
@@ -38,9 +38,29 @@ If you sideloaded a test build before 1.0.0, uninstall it first: release builds 
 
 ## Updates
 
-The app checks this repository's latest release once a day (and from *Check for updates* in the menu). A release whose tag (for example `v1.1.0`) is newer than the installed version, with an `.apk` attached, is offered for download and install.
+Both apps update themselves through your own Lyrion server, using the LegacyLyrion Updates plugin installed on it. The phone asks the server over its normal plain-HTTP port (`/legacylyrion/update/android.json` for LegacyLyrion, `/legacylyrion/update/retro.json` for Retro), so it works on every Android version. Phones before Android 9 or 10 mostly can't reach GitHub any more, because their TLS and certificates are too old. The plugin mirrors the GitHub releases, or serves builds you push to it yourself.
 
-GitHub requires TLS 1.2. Android 4.1 to 4.3 have it but leave it switched off, so the updater turns it on. **Android 4.0 cannot reach GitHub at all**; update those phones by downloading the APK from another device or a computer.
+Updates are checked once a day and from *Check for updates* in the menu. A build is offered when its versionCode is higher than the installed one, and the download is checked against the SHA-256 the server publishes before the installer opens it. Without the plugin on the server, *Check for updates* says so.
+
+LegacyLyrion can also check GitHub directly instead (*Settings > Updates from > GitHub*), for advanced users on Android 9 and newer. Retro only uses the server.
+
+## LegacyLyrion Retro (Android 1.5 to 2.x)
+
+A separate, smaller app for the phones before Ice Cream Sandwich: Sony Ericsson Xperia X10 mini and mini pro, X8, W8, Samsung Galaxy, Galaxy 5 and Galaxy S, and anything else from Android 1.5 Cupcake to 2.3 Gingerbread. It installs next to LegacyLyrion (package `com.h33ted.legacylyrion.retro`) and does the same core job:
+
+- **Library, Spotify, YouTube Music and Radio tabs**, plus Favorites and Apps under *More*. The Spotify and YouTube Music tabs appear when the server has those plugins; the library is the server's own *My Music* menu.
+- **The phone is a player** (`Android - <model>`, for example `Android - U20i`), or a remote for any other Lyrion player (menu > *Players*). Headset buttons, pause when headphones are unplugged, pause for phone calls, and a status bar notification.
+- **Now Playing in the phone's own player style.** Nothing is copied into the app; it borrows from what the phone already has, at run time:
+  - Sony Ericsson 2010 phones with WALKMAN / Music (X10 mini, X8, W8): its round keys, corner keys, infinity key, seek bar and background, with the Sony Ericsson theme on every screen;
+  - Sony Ericsson 2011 phones (Xperia arc, ray, neo...): the 2011 WALKMAN layout, with the keys over the cover, library / infinity / queue along the bottom, the title in the phone's theme colour and the background tinted from the artwork;
+  - the Xperia X10 on Android 1.6: Mediascape's ring keys, controller bar, wave background and CD case;
+  - Samsung Galaxy S and S2: the TouchWiz music player's keys, seek bar and title strip, and TouchWiz's own title bars and tabs;
+  - phones with the stock Android music player (Galaxy 5 and most others): its album frame and the system media keys;
+  - anything else: the Walkman layout, drawn by the app.
+- **Lock screen on the Galaxy S and S2.** Samsung's lock screen shows title, artist and artwork and its play / pause / next / previous keys work, the same as for Samsung's own player. For the artwork, the app keeps the current cover in `Android/data/com.h33ted.legacylyrion.retro/art` on the SD card (out of the Gallery) and registers it with the phone's media database, which is the only place that lock screen reads covers from. Other apps and widgets that follow the stock player's `com.android.music.metachanged` broadcasts see the track too.
+- Volume keys change the phone's volume when it plays, and the chosen player's volume otherwise. Works with the trackball / D-pad.
+
+Download `LegacyLyrionRetro-<version>.apk` from the [latest release](../../releases/latest); every release carries both apps with the same version number. Tested on the Xperia X10 (Android 1.6), X10 mini pro (1.6), W8 (2.1), arc S (2.3.4), Samsung Galaxy 5 (2.1), Galaxy S (2.2) and Galaxy S2 (2.3.5). On Android versions before 4.0 the phone can't pass a server login on to the audio stream, so a password-protected server can be browsed and controlled, but the phone itself plays only if the stream is reachable without a login.
 
 ## Building
 
@@ -50,7 +70,9 @@ The project is a plain Gradle project (Android Gradle Plugin 4.2.2, Gradle 6.9, 
 gradle assembleDebug
 ```
 
-Releases are built by GitHub Actions: pushing a tag like `v1.1.0` builds an APK signed with the release key (stored as repository secrets) and publishes it as a release. See `.github/workflows/release.yml`.
+This builds both apps (`app/` and `retro/`). The Retro build needs the classic `aapt` from build-tools 28.0.3 as well: Android 1.5 to 2.1 can only read resource tables with UTF-16 strings, which the newer aapt2 never writes, so the build rebuilds Retro's small resource table with `aapt` (see `retro/build.gradle`).
+
+Releases are built by GitHub Actions: pushing a tag like `v1.3.1` builds the APKs signed with the release key (stored as repository secrets) and publishes them as a release. See `.github/workflows/release.yml`. The same build makes LegacyLyrion Retro and attaches it to the same release.
 
 ## How it works
 

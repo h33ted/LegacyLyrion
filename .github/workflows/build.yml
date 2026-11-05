@@ -35,10 +35,15 @@ jobs:
         with:
           gradle-version: 6.9.4
 
-      - name: Build debug APK
-        run: gradle assembleDebug
+      - name: Build debug APKs
+        run: gradle :app:assembleDebug :retro:assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
           name: LegacyLyrion-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LegacyLyrionRetro-debug
+          path: retro/build/outputs/apk/debug/LegacyLyrionRetro-debug.apk
