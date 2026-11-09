@@ -1040,7 +1040,7 @@ public class HomeActivity extends Activity {
         sizeLabel.setText("Size");
         sizeLabel.setPadding(0, Ui.dp(this, 12), 0, 0);
         final Spinner size = new Spinner(this);
-        final int[] sizes = {60, 70, 80, 90, 100, 110, 125};
+        final int[] sizes = {70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125};
         String[] sizeNames = new String[sizes.length];
         for (int i = 0; i < sizes.length; i++) sizeNames[i] = sizes[i] + "%" + (sizes[i] == 100 ? " (phone default)" : "");
         ArrayAdapter<String> sizeAd = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, sizeNames);
