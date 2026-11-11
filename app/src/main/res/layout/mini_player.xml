@@ -6,10 +6,11 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <View
+    <ProgressBar
+        android:id="@+id/miniProgress"
+        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="?android:attr/dividerHorizontal" />
+        android:layout_height="1dp" />
 
     <LinearLayout
         android:id="@+id/miniPlayer"

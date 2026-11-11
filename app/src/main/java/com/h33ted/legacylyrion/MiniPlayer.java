@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.ProgressBar;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -19,8 +20,10 @@ final class MiniPlayer {
     private final ImageView art;
     private final TextView title, artist;
     private final GlyphView playPause, next;
+    private final ProgressBar miniProgress;
     private final Handler h = new Handler();
     private boolean playing, inFlight, running;
+    private double elapsed, duration;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -38,6 +41,7 @@ final class MiniPlayer {
         artist = (TextView) a.findViewById(R.id.miniArtist);
         playPause = (GlyphView) a.findViewById(R.id.miniPlayPause);
         next = (GlyphView) a.findViewById(R.id.miniNext);
+        miniProgress = (ProgressBar) a.findViewById(R.id.miniProgress);
         playPause.setGlyph(GlyphView.PLAY);
         next.setGlyph(GlyphView.NEXT);
         Ui.placeholder(art, false);
@@ -88,6 +92,11 @@ final class MiniPlayer {
         playPause.setGlyph(playing ? GlyphView.PAUSE : GlyphView.PLAY);
     }
 
+    private void updateTime() {
+        miniProgress.setMax(Math.max(1, (int) duration));
+        miniProgress.setProgress((int) elapsed);
+    }
+
     private void poll() {
         if (inFlight) return;
         inFlight = true;
@@ -103,6 +112,9 @@ final class MiniPlayer {
                     root.setVisibility(View.GONE);
                     return;
                 }
+                elapsed = r.optDouble("time", 0);
+                duration = r.optDouble("duration", 0);
+                updateTime();
                 root.setVisibility(View.VISIBLE);
                 title.setText(t.optString("title", ""));
                 String ar = t.optString("artist", "");
