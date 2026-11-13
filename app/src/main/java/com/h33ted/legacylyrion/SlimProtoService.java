@@ -320,10 +320,18 @@ public class SlimProtoService extends Service {
         } else if ("audg".equals(cmd) && payload.length >= 8) {
             handleAudgCommand(payload);
         } else if ("setd".equals(cmd) && payload.length >= 1 && payload[0] == 0) {
-            // Server asks for the player name: reply with SETD id 0 + name
             if (payload.length == 1) {
+                // Server asks for the player name.. ignore and let it use already-set name
+            } else {
+                // Server assigns us a player name
+                int end = 1;
+                while (end < payload.length && payload[end] != 0) {
+                    end++;
+                }
+                String assignedName = new String(payload, 1, end - 1, Charset.forName("UTF-8"));
+                // Acknowledge
                 try {
-                    byte[] name = deviceName().getBytes("UTF-8");
+                    byte[] name = assignedName.getBytes(Charset.forName("UTF-8"));
                     byte[] out = new byte[name.length + 2];
                     out[0] = 0;
                     System.arraycopy(name, 0, out, 1, name.length);
