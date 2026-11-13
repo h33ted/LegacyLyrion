@@ -110,12 +110,14 @@ final class MiniPlayer {
                 JSONObject t = loop == null ? null : loop.optJSONObject(0);
                 if (t == null) {
                     root.setVisibility(View.GONE);
+                    miniProgress.setVisibility(View.GONE);
                     return;
                 }
                 elapsed = r.optDouble("time", 0);
                 duration = r.optDouble("duration", 0);
                 updateTime();
                 root.setVisibility(View.VISIBLE);
+                miniProgress.setVisibility(View.VISIBLE);
                 title.setText(t.optString("title", ""));
                 String ar = t.optString("artist", "");
                 if (ar.length() == 0) ar = t.optString("album", "");
