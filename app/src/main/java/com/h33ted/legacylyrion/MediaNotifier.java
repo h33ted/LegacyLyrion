@@ -32,6 +32,7 @@ final class MediaNotifier {
     static final String ACTION_TOGGLE = "com.h33ted.legacylyrion.TOGGLE";
     static final String ACTION_NEXT = "com.h33ted.legacylyrion.NEXT";
     static final String ACTION_PAUSE = "com.h33ted.legacylyrion.PAUSE";
+    static final String ACTION_PLAY = "com.h33ted.legacylyrion.PLAY";
 
     private final Service svc;
     private final int notifId;
@@ -40,7 +41,7 @@ final class MediaNotifier {
     private final AudioManager am;
     private final ComponentName buttonReceiver;
     private RemoteControlClient rcc;
-    private boolean running, inFlight, playing, hasFocus;
+    private boolean running, inFlight, playing, hasFocus, resumeAfterFocusGain;
     private String title = "LegacyLyrion", artist = "Ready", album = "", artUrl;
     private long durationMs;
     private boolean wasPlaying;
@@ -58,10 +59,19 @@ final class MediaNotifier {
     private final AudioManager.OnAudioFocusChangeListener focus = new AudioManager.OnAudioFocusChangeListener() {
         @Override
         public void onAudioFocusChange(int change) {
-            if (change == AudioManager.AUDIOFOCUS_LOSS) {
+            if (change == AudioManager.AUDIOFOCUS_LOSS
+                || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+                || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
                 hasFocus = false;
                 // another app started playing: pause like a stock player would (only for this phone's player)
-                if (isLocal() && playing) command(ACTION_PAUSE);
+                if (isLocal() && playing) {
+                    resumeAfterFocusGain = change != AudioManager.AUDIOFOCUS_LOSS;
+                    command(ACTION_PAUSE);
+                }
+            }
+            if (change == AudioManager.AUDIOFOCUS_GAIN && resumeAfterFocusGain) {
+                resumeAfterFocusGain = false;
+                if (isLocal()) command(ACTION_PLAY);
             }
         }
     };
@@ -124,6 +134,7 @@ final class MediaNotifier {
         if (ACTION_PREV.equals(action)) cmd = Rpc.cmd("playlist", "index", "-1");
         else if (ACTION_NEXT.equals(action)) cmd = Rpc.cmd("playlist", "index", "+1");
         else if (ACTION_PAUSE.equals(action)) cmd = Rpc.cmd("pause", "1");
+        else if (ACTION_PLAY.equals(action)) cmd = Rpc.cmd("play");
         else if (ACTION_TOGGLE.equals(action)) {
             playing = !playing;
             cmd = playing ? Rpc.cmd("play") : Rpc.cmd("pause", "1");
